@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { 
   Bell, RefreshCw, Heart, MessageCircle, UserPlus, 
-  Users, FileText, Mail, Check, CheckCheck, Trash2
+  Users, FileText, Mail, CheckCheck, Trash2, Wifi, WifiOff
 } from "lucide-react";
 
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -23,6 +23,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
 type NotificationData = {
   post_id?: string;
@@ -75,6 +77,8 @@ export default function Notifications() {
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [notificationToDelete, setNotificationToDelete] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const userId = user?.id ?? null;
 
@@ -102,6 +106,83 @@ export default function Notifications() {
 
     setItems((data ?? []) as NotificationRow[]);
     setLoading(false);
+  }, [userId]);
+
+  // Real-time subscription for new notifications
+  useEffect(() => {
+    if (!userId) {
+      setIsConnected(false);
+      return;
+    }
+
+    // Subscribe to realtime changes
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          console.log('New notification received:', payload);
+          const newNotification = payload.new as NotificationRow;
+          
+          // Add to the top of the list
+          setItems((prev) => [newNotification, ...prev.slice(0, 49)]);
+          
+          // Show toast for new notification
+          toast({
+            title: newNotification.title,
+            description: newNotification.body || undefined,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const updatedNotification = payload.new as NotificationRow;
+          setItems((prev) =>
+            prev.map((n) => (n.id === updatedNotification.id ? updatedNotification : n))
+          );
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const deletedId = (payload.old as { id: string }).id;
+          setItems((prev) => prev.filter((n) => n.id !== deletedId));
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+        setIsConnected(status === 'SUBSCRIBED');
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      console.log('Cleaning up realtime subscription');
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      setIsConnected(false);
+    };
   }, [userId]);
 
   useEffect(() => {
@@ -230,7 +311,27 @@ export default function Notifications() {
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Notifications</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">Notifications</h1>
+              {userId && (
+                <Badge 
+                  variant={isConnected ? "default" : "secondary"} 
+                  className={`text-xs ${isConnected ? 'bg-green-500 hover:bg-green-600' : ''}`}
+                >
+                  {isConnected ? (
+                    <>
+                      <Wifi className="h-3 w-3 mr-1" />
+                      Live
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="h-3 w-3 mr-1" />
+                      Offline
+                    </>
+                  )}
+                </Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">
               {userId ? (unreadCount ? `${unreadCount} unread` : "You're all caught up") : "Sign in to see your notifications"}
             </p>
