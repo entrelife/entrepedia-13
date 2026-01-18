@@ -56,9 +56,13 @@ export function Navbar() {
           <Link to="/" className="flex items-center gap-2">
             <img 
               src="/assets/logo.jpeg" 
-              alt="Sam Logo" 
+              alt="സംരംഭക.com Logo" 
               className="h-9 w-auto rounded-lg"
             />
+            <span className="font-bold text-lg hidden sm:inline">
+              <span className="text-primary">സംരംഭക</span>
+              <span className="text-muted-foreground">.com</span>
+            </span>
           </Link>
 
           {/* Search - Hidden on mobile */}
