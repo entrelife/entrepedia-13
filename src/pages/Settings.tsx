@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Camera, Save, LogOut, Mail, CheckCircle, AlertCircle, AlertTriangle, User } from 'lucide-react';
 import { PanchayathLocationPicker } from '@/components/settings/PanchayathLocationPicker';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -102,21 +103,43 @@ export default function Settings() {
   };
 
   // Calculate profile completion
-  const isProfileIncomplete = !profile?.full_name || !profile?.username || !profile?.bio || !profile?.avatar_url || !profile?.location;
+  const profileFields = [
+    { key: 'full_name', label: 'Full Name', completed: !!profile?.full_name },
+    { key: 'username', label: 'Username', completed: !!profile?.username },
+    { key: 'bio', label: 'Bio', completed: !!profile?.bio },
+    { key: 'avatar_url', label: 'Profile Photo', completed: !!profile?.avatar_url },
+    { key: 'location', label: 'Location', completed: !!profile?.location },
+  ];
+  
+  const completedCount = profileFields.filter(f => f.completed).length;
+  const completionPercentage = Math.round((completedCount / profileFields.length) * 100);
+  const isProfileIncomplete = completionPercentage < 100;
   const isEmailNotVerified = !user.email || user.email.includes('@phone.local');
   
   const getMissingFields = () => {
-    const missing: string[] = [];
-    if (!profile?.full_name) missing.push('Full Name');
-    if (!profile?.username) missing.push('Username');
-    if (!profile?.bio) missing.push('Bio');
-    if (!profile?.avatar_url) missing.push('Profile Photo');
-    if (!profile?.location) missing.push('Location');
-    return missing;
+    return profileFields.filter(f => !f.completed).map(f => f.label);
   };
 
   return (
     <MainLayout>
+      {/* Sticky Profile Completion Progress Bar */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-foreground">Profile Completion</span>
+            <span className={`text-sm font-bold ${completionPercentage === 100 ? 'text-green-600' : 'text-primary'}`}>
+              {completionPercentage}%
+            </span>
+          </div>
+          <Progress value={completionPercentage} className="h-2" />
+          {completionPercentage < 100 && (
+            <p className="text-xs text-muted-foreground mt-1">
+              Complete your profile to unlock all features
+            </p>
+          )}
+        </div>
+      </div>
+
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         <h1 className="text-3xl font-bold text-foreground">Settings</h1>
 
