@@ -64,20 +64,26 @@ export function PostCard({ post, onUpdate }: PostCardProps) {
 
     setIsLiking(true);
     try {
-      if (isLiked) {
-        await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', post.id)
-          .eq('user_id', user.id);
-      } else {
-        await supabase
-          .from('post_likes')
-          .insert({ post_id: post.id, user_id: user.id });
+      // Use edge function to bypass RLS (since we use custom auth)
+      const response = await supabase.functions.invoke('toggle-like', {
+        body: {
+          user_id: user.id,
+          post_id: post.id,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to toggle like');
       }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
       onUpdate();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error toggling like:', error);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setIsLiking(false);
     }

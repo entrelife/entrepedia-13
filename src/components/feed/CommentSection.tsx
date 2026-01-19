@@ -65,19 +65,28 @@ export function CommentSection({ postId, onCommentAdded }: CommentSectionProps) 
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('comments').insert({
-        post_id: postId,
-        user_id: user.id,
-        content: newComment.trim(),
+      // Use edge function to bypass RLS (since we use custom auth)
+      const response = await supabase.functions.invoke('create-comment', {
+        body: {
+          user_id: user.id,
+          post_id: postId,
+          content: newComment.trim(),
+        },
       });
 
-      if (error) throw error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to create comment');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       setNewComment('');
       fetchComments();
       onCommentAdded();
     } catch (error: any) {
-      toast({ title: 'Error posting comment', variant: 'destructive' });
+      toast({ title: 'Error posting comment', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }

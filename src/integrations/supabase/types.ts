@@ -715,6 +715,9 @@ export type Database = {
           location: string | null
           mobile_number: string | null
           role: Database["public"]["Enums"]["user_role"] | null
+          show_email: boolean | null
+          show_location: boolean | null
+          show_mobile: boolean | null
           updated_at: string | null
           username: string | null
         }
@@ -738,6 +741,9 @@ export type Database = {
           location?: string | null
           mobile_number?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          show_email?: boolean | null
+          show_location?: boolean | null
+          show_mobile?: boolean | null
           updated_at?: string | null
           username?: string | null
         }
@@ -761,6 +767,9 @@ export type Database = {
           location?: string | null
           mobile_number?: string | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          show_email?: boolean | null
+          show_location?: boolean | null
+          show_mobile?: boolean | null
           updated_at?: string | null
           username?: string | null
         }

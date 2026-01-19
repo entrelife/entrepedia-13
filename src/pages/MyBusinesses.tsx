@@ -125,17 +125,24 @@ export default function MyBusinesses() {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('businesses')
-        .insert({
+      // Use edge function to bypass RLS (since we use custom auth)
+      const response = await supabase.functions.invoke('create-business', {
+        body: {
+          user_id: user.id,
           name: name.trim(),
           description: description.trim() || null,
           category,
           location: location.trim() || null,
-          owner_id: user.id,
-        });
+        },
+      });
 
-      if (error) throw error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to create business');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       toast({ title: 'Business created successfully!' });
       setDialogOpen(false);
@@ -152,12 +159,22 @@ export default function MyBusinesses() {
     if (!confirm('Are you sure you want to delete this business?')) return;
 
     try {
-      const { error } = await supabase
-        .from('businesses')
-        .delete()
-        .eq('id', businessId);
+      // Use edge function to bypass RLS
+      const response = await supabase.functions.invoke('manage-business', {
+        body: {
+          action: 'delete',
+          user_id: user?.id,
+          business_id: businessId,
+        },
+      });
 
-      if (error) throw error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to delete business');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       toast({ title: 'Business deleted' });
       fetchBusinesses();
@@ -183,17 +200,26 @@ export default function MyBusinesses() {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('businesses')
-        .update({
+      // Use edge function to bypass RLS
+      const response = await supabase.functions.invoke('manage-business', {
+        body: {
+          action: 'update',
+          user_id: user.id,
+          business_id: editingBusiness.id,
           name: name.trim(),
           description: description.trim() || null,
           category,
           location: location.trim() || null,
-        })
-        .eq('id', editingBusiness.id);
+        },
+      });
 
-      if (error) throw error;
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to update business');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
 
       toast({ title: 'Business updated successfully!' });
       setEditDialogOpen(false);
