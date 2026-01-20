@@ -164,32 +164,20 @@ export default function Friends() {
     }
 
     const isFollowing = followingStates[userId];
+    const action = isFollowing ? 'unfollow' : 'follow';
 
     try {
-      if (isFollowing) {
-        await supabase
-          .from('follows')
-          .delete()
-          .eq('follower_id', user.id)
-          .eq('following_id', userId);
+      const { data, error } = await supabase.functions.invoke('toggle-follow', {
+        body: { following_id: userId, action }
+      });
 
-        toast({ title: 'Unfollowed successfully' });
-      } else {
-        await supabase
-          .from('follows')
-          .insert({ follower_id: user.id, following_id: userId });
-
-        // Create a notification for the person being followed
-        await supabase.from('notifications').insert({
-          user_id: userId,
-          type: 'follow',
-          title: 'New follower',
-          body: 'Someone started following you!',
-          data: { follower_id: user.id },
-        });
-
-        toast({ title: 'Following!' });
+      if (error) {
+        console.error('Error toggling follow:', error);
+        toast({ title: 'Error', description: 'Failed to update follow status', variant: 'destructive' });
+        return;
       }
+
+      toast({ title: isFollowing ? 'Unfollowed successfully' : 'Following!' });
 
       setFollowingStates(prev => ({
         ...prev,

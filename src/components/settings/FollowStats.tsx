@@ -98,11 +98,9 @@ export function FollowStats({ userId }: FollowStatsProps) {
   const handleUnfollow = async (targetId: string) => {
     setUnfollowingId(targetId);
     try {
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('follower_id', userId)
-        .eq('following_id', targetId);
+      const { error } = await supabase.functions.invoke('toggle-follow', {
+        body: { following_id: targetId, action: 'unfollow' }
+      });
 
       if (error) throw error;
 
@@ -122,23 +120,11 @@ export function FollowStats({ userId }: FollowStatsProps) {
   const handleFollowBack = async (targetId: string) => {
     setUnfollowingId(targetId);
     try {
-      const { error } = await supabase
-        .from('follows')
-        .insert({
-          follower_id: userId,
-          following_id: targetId,
-        });
+      const { error } = await supabase.functions.invoke('toggle-follow', {
+        body: { following_id: targetId, action: 'follow' }
+      });
 
       if (error) throw error;
-
-      // Create a notification for the person being followed
-      await supabase.from('notifications').insert({
-        user_id: targetId,
-        type: 'follow',
-        title: 'New follower',
-        body: 'Someone started following you!',
-        data: { follower_id: userId },
-      });
 
       // Find the user from followers and add to following
       const userToAdd = followers.find(f => f.id === targetId);
