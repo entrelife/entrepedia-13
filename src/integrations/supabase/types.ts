@@ -571,6 +571,33 @@ export type Database = {
           },
         ]
       }
+      password_reset_otps: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          is_used: boolean
+          mobile_number: string
+          otp_code: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          mobile_number: string
+          otp_code: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          mobile_number?: string
+          otp_code?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           id: string
@@ -1027,6 +1054,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_otps: { Args: never; Returns: undefined }
       contains_blocked_words: { Args: { content: string }; Returns: boolean }
       get_or_create_conversation: {
         Args: { current_user_id?: string; other_user_id: string }
