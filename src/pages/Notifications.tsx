@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { 
   Bell, RefreshCw, Heart, MessageCircle, UserPlus, 
-  Users, FileText, Mail, CheckCheck, Trash2, Wifi, WifiOff
+  Users, FileText, Mail, CheckCheck, Trash2, Wifi, WifiOff,
+  Building2, Megaphone
 } from "lucide-react";
 
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -39,6 +40,7 @@ type NotificationData = {
   conversation_id?: string;
   message_id?: string;
   sender_id?: string;
+  business_id?: string;
 };
 
 type NotificationRow = {
@@ -57,8 +59,13 @@ const notificationIcons: Record<string, React.ReactNode> = {
   comment: <MessageCircle className="h-5 w-5 text-blue-500" />,
   follow: <UserPlus className="h-5 w-5 text-green-500" />,
   community_discussion: <Users className="h-5 w-5 text-purple-500" />,
+  community_update: <Users className="h-5 w-5 text-purple-500" />,
+  community_join: <Users className="h-5 w-5 text-purple-500" />,
   new_post: <FileText className="h-5 w-5 text-orange-500" />,
   message: <Mail className="h-5 w-5 text-primary" />,
+  business_update: <Building2 className="h-5 w-5 text-amber-500" />,
+  business_follow: <Building2 className="h-5 w-5 text-amber-500" />,
+  business_post: <Megaphone className="h-5 w-5 text-amber-500" />,
 };
 
 const notificationBgColors: Record<string, string> = {
@@ -66,8 +73,13 @@ const notificationBgColors: Record<string, string> = {
   comment: "bg-blue-100 dark:bg-blue-900/30",
   follow: "bg-green-100 dark:bg-green-900/30",
   community_discussion: "bg-purple-100 dark:bg-purple-900/30",
+  community_update: "bg-purple-100 dark:bg-purple-900/30",
+  community_join: "bg-purple-100 dark:bg-purple-900/30",
   new_post: "bg-orange-100 dark:bg-orange-900/30",
   message: "bg-primary/10",
+  business_update: "bg-amber-100 dark:bg-amber-900/30",
+  business_follow: "bg-amber-100 dark:bg-amber-900/30",
+  business_post: "bg-amber-100 dark:bg-amber-900/30",
 };
 
 export default function Notifications() {
@@ -229,6 +241,8 @@ export default function Notifications() {
         }
         break;
       case "community_discussion":
+      case "community_update":
+      case "community_join":
         if (data.community_id) {
           navigate(`/community/${data.community_id}`);
         }
@@ -236,6 +250,13 @@ export default function Notifications() {
       case "message":
         if (data.conversation_id) {
           navigate(`/messages?conversation=${data.conversation_id}`);
+        }
+        break;
+      case "business_update":
+      case "business_follow":
+      case "business_post":
+        if (data.business_id) {
+          navigate(`/business/${data.business_id}`);
         }
         break;
     }
