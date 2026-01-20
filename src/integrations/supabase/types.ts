@@ -930,6 +930,33 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          session_token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          session_token: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          is_active?: boolean
+          session_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_skills: {
         Row: {
           created_at: string | null
@@ -1021,6 +1048,7 @@ export type Database = {
         Returns: boolean
       }
       is_following: { Args: { target_user_id: string }; Returns: boolean }
+      validate_session: { Args: { p_session_token: string }; Returns: string }
     }
     Enums: {
       admin_role: "super_admin" | "content_moderator" | "category_manager"

@@ -33,33 +33,20 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  getConversations, 
+  getMessages, 
+  sendMessage, 
+  getOrCreateConversation, 
+  deleteConversation, 
+  deleteMessage,
+  markMessagesAsRead,
+  type Conversation,
+  type Message
+} from '@/hooks/useMessaging';
 import { Send, MessageCircle, ArrowLeft, Circle, Plus, Search, UserPlus, MoreVertical, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-
-interface Conversation {
-  id: string;
-  participant_one: string | null;
-  participant_two: string | null;
-  last_message_at: string | null;
-  other_user: {
-    id: string;
-    full_name: string | null;
-    username: string | null;
-    avatar_url: string | null;
-    is_online: boolean | null;
-  } | null;
-  last_message?: string;
-  unread_count?: number;
-}
-
-interface Message {
-  id: string;
-  content: string;
-  sender_id: string | null;
-  created_at: string | null;
-  is_read: boolean | null;
-}
 
 interface FollowedUser {
   id: string;
@@ -130,8 +117,8 @@ export default function Messages() {
           setMessages((prev) => [...prev, newMsg]);
           
           // Mark as read if not sender
-          if (newMsg.sender_id !== user?.id) {
-            markAsRead(newMsg.id);
+          if (newMsg.sender_id !== user?.id && selectedConversation) {
+            markAsRead(selectedConversation.id);
           }
         }
       )
@@ -190,56 +177,11 @@ export default function Messages() {
     
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select('*')
-        .or(`participant_one.eq.${user.id},participant_two.eq.${user.id}`)
-        .order('last_message_at', { ascending: false });
+      const { data, error } = await getConversations();
 
       if (error) throw error;
 
-      // Enrich with other user data
-      const enrichedConversations = await Promise.all(
-        (data || []).map(async (conv) => {
-          const otherUserId = conv.participant_one === user.id 
-            ? conv.participant_two 
-            : conv.participant_one;
-
-          if (!otherUserId) return { ...conv, other_user: null };
-
-          const { data: userData } = await supabase
-            .from('profiles')
-            .select('id, full_name, username, avatar_url, is_online')
-            .eq('id', otherUserId)
-            .single();
-
-          // Get last message
-          const { data: lastMsg } = await supabase
-            .from('messages')
-            .select('content')
-            .eq('conversation_id', conv.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          // Get unread count
-          const { count } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conv.id)
-            .eq('is_read', false)
-            .neq('sender_id', user.id);
-
-          return {
-            ...conv,
-            other_user: userData,
-            last_message: lastMsg?.content,
-            unread_count: count || 0,
-          };
-        })
-      );
-
-      setConversations(enrichedConversations);
+      setConversations(data?.conversations || []);
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {
@@ -257,34 +199,17 @@ export default function Messages() {
 
   const fetchMessages = async (convId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation_id', convId)
-        .order('created_at', { ascending: true });
+      const { data, error } = await getMessages(convId);
 
       if (error) throw error;
-      setMessages(data || []);
-
-      // Mark messages as read
-      if (user) {
-        await supabase
-          .from('messages')
-          .update({ is_read: true })
-          .eq('conversation_id', convId)
-          .neq('sender_id', user.id)
-          .eq('is_read', false);
-      }
+      setMessages(data?.messages || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
     }
   };
 
-  const markAsRead = async (messageId: string) => {
-    await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('id', messageId);
+  const markAsRead = async (convId: string) => {
+    await markMessagesAsRead(convId);
   };
 
   const handleSend = async () => {
@@ -292,24 +217,18 @@ export default function Messages() {
 
     setSending(true);
     try {
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: selectedConversation.id,
-          sender_id: user.id,
-          content: newMessage.trim(),
-        });
+      const { data, error } = await sendMessage(selectedConversation.id, newMessage.trim());
 
       if (error) throw error;
 
-      // Update conversation last_message_at
-      await supabase
-        .from('conversations')
-        .update({ last_message_at: new Date().toISOString() })
-        .eq('id', selectedConversation.id);
+      // Add the new message to local state immediately for better UX
+      if (data?.message) {
+        setMessages(prev => [...prev, data.message]);
+      }
 
       setNewMessage('');
     } catch (error: unknown) {
+      console.error('Error sending message:', error);
       toast({ title: 'Error sending message', variant: 'destructive' });
     } finally {
       setSending(false);
@@ -330,18 +249,14 @@ export default function Messages() {
     if (!user) return;
 
     try {
-      const { data: conversationId, error } = await supabase
-        .rpc('get_or_create_conversation', { 
-          other_user_id: otherUserId,
-          current_user_id: user.id 
-        });
+      const { data, error } = await getOrCreateConversation(otherUserId);
 
       if (error) throw error;
 
-      if (conversationId) {
+      if (data?.conversation_id) {
         setNewChatOpen(false);
         await fetchConversations();
-        navigate(`/messages/${conversationId}`);
+        navigate(`/messages/${data.conversation_id}`);
       }
     } catch (error) {
       console.error('Error starting conversation:', error);
@@ -363,17 +278,7 @@ export default function Messages() {
     if (!conversationToDelete) return;
 
     try {
-      // First delete all messages in the conversation
-      await supabase
-        .from('messages')
-        .delete()
-        .eq('conversation_id', conversationToDelete);
-
-      // Then delete the conversation
-      const { error } = await supabase
-        .from('conversations')
-        .delete()
-        .eq('id', conversationToDelete);
+      const { error } = await deleteConversation(conversationToDelete);
 
       if (error) throw error;
 
@@ -408,10 +313,7 @@ export default function Messages() {
     if (!messageToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageToDelete);
+      const { error } = await deleteMessage(messageToDelete);
 
       if (error) throw error;
 

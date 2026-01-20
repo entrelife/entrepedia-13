@@ -110,8 +110,20 @@ serve(async (req) => {
         );
       }
 
-      // Generate session token
+      // Generate session token and store in database
       const sessionToken = generateSessionToken();
+      
+      const { error: sessionError } = await supabase
+        .from("user_sessions")
+        .insert({
+          user_id: credentials.id,
+          session_token: sessionToken,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+        });
+
+      if (sessionError) {
+        console.error("Session creation error:", sessionError);
+      }
 
       return new Response(
         JSON.stringify({
@@ -125,7 +137,7 @@ serve(async (req) => {
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    } 
+    }
     
     else if (action === "signin") {
       // Get user credentials
@@ -158,8 +170,27 @@ serve(async (req) => {
         .eq("id", credentials.id)
         .single();
 
-      // Generate session token
+      // Generate session token and store in database
       const sessionToken = generateSessionToken();
+      
+      // Invalidate old sessions for this user
+      await supabase
+        .from("user_sessions")
+        .update({ is_active: false })
+        .eq("user_id", credentials.id);
+
+      // Create new session
+      const { error: sessionError } = await supabase
+        .from("user_sessions")
+        .insert({
+          user_id: credentials.id,
+          session_token: sessionToken,
+          expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
+        });
+
+      if (sessionError) {
+        console.error("Session creation error:", sessionError);
+      }
 
       // Update online status
       await supabase
