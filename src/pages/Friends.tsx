@@ -140,8 +140,8 @@ export default function Friends() {
     try {
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, username, avatar_url, bio, location, is_verified')
-        .or(`full_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+        .select('id, full_name, username, avatar_url, bio, location, is_verified, mobile_number')
+        .or(`full_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%,mobile_number.ilike.%${searchQuery}%`)
         .neq('id', user?.id || '')
         .limit(20);
 
@@ -223,7 +223,7 @@ export default function Friends() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search for friends by name or username..."
+                placeholder="Search by name, username, or mobile number..."
                 className="pl-10"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -402,9 +402,11 @@ function FriendCard({ friend, isFollowing, onFollow, onNavigate, showLocation }:
               </p>
               {friend.is_verified && <VerificationBadge isVerified={true} size="sm" />}
             </div>
-            <p className="text-sm text-muted-foreground truncate">
-              @{friend.username || 'user'}
-            </p>
+            {friend.username && !/^\d+$/.test(friend.username) && (
+              <p className="text-sm text-muted-foreground truncate">
+                @{friend.username}
+              </p>
+            )}
             {showLocation && friend.location && (
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 <MapPin className="h-3 w-3" />

@@ -157,7 +157,9 @@ export function Navbar() {
                       </Avatar>
                       <div className="flex flex-col">
                         <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
-                        <p className="text-xs text-muted-foreground">@{profile?.username || 'username'}</p>
+                        {profile?.username && !/^\d+$/.test(profile.username) && (
+                          <p className="text-xs text-muted-foreground">@{profile.username}</p>
+                        )}
                       </div>
                     </div>
                     <DropdownMenuSeparator />
