@@ -113,16 +113,17 @@ export default function AdminReports() {
 
   const hidePostMutation = useMutation({
     mutationFn: async (postId: string) => {
-      const { error } = await supabase
-        .from('posts')
-        .update({ 
-          is_hidden: true, 
-          hidden_at: new Date().toISOString(),
-          hidden_reason: 'Hidden by admin due to report'
-        })
-        .eq('id', postId);
+      const response = await supabase.functions.invoke('admin-post-actions', {
+        body: {
+          action: 'hide',
+          post_id: postId,
+          user_id: currentUser?.id,
+          reason: 'Hidden by admin due to report',
+        },
+      });
 
-      if (error) throw error;
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
     },
     onSuccess: () => {
       toast.success('Post hidden successfully');
@@ -135,12 +136,17 @@ export default function AdminReports() {
 
   const deletePostMutation = useMutation({
     mutationFn: async (postId: string) => {
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId);
+      const response = await supabase.functions.invoke('admin-post-actions', {
+        body: {
+          action: 'delete',
+          post_id: postId,
+          user_id: currentUser?.id,
+          reason: 'Deleted by admin',
+        },
+      });
 
-      if (error) throw error;
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
     },
     onSuccess: () => {
       toast.success('Post deleted successfully');
