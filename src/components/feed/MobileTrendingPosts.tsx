@@ -110,52 +110,48 @@ export function MobileTrendingPosts() {
               <div
                 key={post.id}
                 onClick={() => navigate(`/post/${post.id}`)}
-                className="relative bg-muted/30 rounded-xl w-40 shrink-0 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                className="relative bg-card border border-border rounded-xl w-44 shrink-0 overflow-hidden cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
               >
-                {/* Rank badge */}
-                <Badge
-                  variant="secondary"
-                  className="absolute top-2 left-2 z-10 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs font-bold"
-                >
-                  {index + 1}
-                </Badge>
-
-                {/* Image or gradient background */}
-                {post.image_url ? (
-                  <div
-                    className="h-20 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${post.image_url})` }}
-                  />
-                ) : (
-                  <div className="h-20 gradient-secondary" />
-                )}
-
-                <div className="p-2.5">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Avatar className="h-5 w-5">
+                <div className="p-3">
+                  {/* Header with rank and user */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="flex items-center justify-center h-5 w-5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                      {index + 1}
+                    </span>
+                    <Avatar className="h-6 w-6">
                       <AvatarImage
                         src={post.businesses?.logo_url || post.profiles?.avatar_url || ''}
                       />
-                      <AvatarFallback className="gradient-primary text-white text-[8px]">
+                      <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
                         {(post.businesses?.name || post.profiles?.full_name || 'U').charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-[10px] font-medium text-foreground truncate">
+                    <span className="text-xs font-medium text-foreground truncate flex-1">
                       {post.businesses?.name || post.profiles?.full_name || 'User'}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-muted-foreground line-clamp-2 whitespace-normal leading-tight mb-2">
+                  {/* Content */}
+                  <p className="text-xs text-muted-foreground line-clamp-2 whitespace-normal leading-relaxed mb-2">
                     {post.content || 'Shared a post'}
                   </p>
 
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                    <span className="flex items-center gap-0.5">
-                      <Heart className="h-2.5 w-2.5" />
+                  {/* Image thumbnail if exists */}
+                  {post.image_url && (
+                    <div
+                      className="h-16 rounded-lg bg-cover bg-center mb-2"
+                      style={{ backgroundImage: `url(${post.image_url})` }}
+                    />
+                  )}
+
+                  {/* Engagement stats */}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-3 w-3" />
                       {post.likes_count}
                     </span>
-                    <span className="flex items-center gap-0.5">
-                      <MessageCircle className="h-2.5 w-2.5" />
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="h-3 w-3" />
                       {post.comments_count}
                     </span>
                   </div>
