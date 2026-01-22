@@ -13,7 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import { 
   Users, 
   UserPlus, 
-  UserMinus, 
+  UserMinus,
+  UserX,
   Crown,
   Send,
   MessageSquare,
@@ -217,6 +218,37 @@ export default function CommunityDetail() {
     }
   };
 
+  const handleRemoveMember = async (memberUserId: string, memberName: string) => {
+    if (!user || !id) return;
+    
+    if (!confirm(`Are you sure you want to remove ${memberName} from this community?`)) {
+      return;
+    }
+
+    try {
+      const stored = localStorage.getItem('samrambhak_auth');
+      const sessionToken = stored ? JSON.parse(stored).session_token : null;
+      
+      const { data, error } = await supabase.functions.invoke('manage-community', {
+        body: {
+          action: 'remove_member',
+          community_id: id,
+          member_user_id: memberUserId,
+        },
+        headers: sessionToken ? { 'x-session-token': sessionToken } : {},
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      toast({ title: `${memberName} has been removed from the community` });
+      fetchCommunityData();
+    } catch (error: any) {
+      console.error('Error removing member:', error);
+      toast({ title: 'Error removing member', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleJoin = async () => {
     if (!user || !id) {
       navigate('/auth');
@@ -373,18 +405,23 @@ export default function CommunityDetail() {
               {members.map((member) => (
                 <Card 
                   key={member.id}
-                  className="border-0 shadow-soft cursor-pointer card-hover"
-                  onClick={() => navigate(`/user/${member.user_id}`)}
+                  className="border-0 shadow-soft card-hover"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12">
+                      <Avatar 
+                        className="h-12 w-12 cursor-pointer"
+                        onClick={() => navigate(`/user/${member.user_id}`)}
+                      >
                         <AvatarImage src={member.profiles?.avatar_url || ''} />
                         <AvatarFallback className="gradient-primary text-white">
                           {member.profiles?.full_name?.charAt(0) || 'U'}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 min-w-0">
+                      <div 
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() => navigate(`/user/${member.user_id}`)}
+                      >
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-foreground truncate">
                             {member.profiles?.full_name || 'Anonymous'}
@@ -397,6 +434,19 @@ export default function CommunityDetail() {
                           ID: {member.user_id.slice(0, 8)}
                         </p>
                       </div>
+                      {isCreator && member.user_id !== user?.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveMember(member.user_id, member.profiles?.full_name || 'this member');
+                          }}
+                        >
+                          <UserX className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

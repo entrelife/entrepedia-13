@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { action, community_id, name, description, cover_image_url, discussion_id } = await req.json();
+    const { action, community_id, name, description, cover_image_url, discussion_id, member_user_id } = await req.json();
 
     // CREATE community
     if (action === "create") {
@@ -297,6 +297,67 @@ Deno.serve(async (req) => {
         console.error("Delete discussion error:", deleteDiscussionError);
         return new Response(
           JSON.stringify({ error: deleteDiscussionError.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ success: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // REMOVE MEMBER (admin only)
+    if (action === "remove_member") {
+      const { member_user_id } = await req.json().catch(() => ({}));
+      
+      if (!community_id) {
+        return new Response(
+          JSON.stringify({ error: "Community ID is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!member_user_id) {
+        return new Response(
+          JSON.stringify({ error: "Member user ID is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Verify admin (community creator)
+      const { data: communityCheck } = await supabase
+        .from("communities")
+        .select("created_by")
+        .eq("id", community_id)
+        .maybeSingle();
+
+      if (!communityCheck || communityCheck.created_by !== userId) {
+        return new Response(
+          JSON.stringify({ error: "Only community admins can remove members" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Prevent admin from removing themselves
+      if (member_user_id === userId) {
+        return new Response(
+          JSON.stringify({ error: "Cannot remove yourself from your own community" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Remove the member
+      const { error: removeError } = await supabase
+        .from("community_members")
+        .delete()
+        .eq("community_id", community_id)
+        .eq("user_id", member_user_id);
+
+      if (removeError) {
+        console.error("Remove member error:", removeError);
+        return new Response(
+          JSON.stringify({ error: removeError.message }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
