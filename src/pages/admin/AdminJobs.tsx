@@ -50,53 +50,45 @@ export default function AdminJobs() {
   const [actionDialog, setActionDialog] = useState<'reject' | null>(null);
   const [actionReason, setActionReason] = useState('');
 
+  // Get admin session token
+  const getSessionToken = () => {
+    const stored = localStorage.getItem('admin_session');
+    return stored ? JSON.parse(stored).session_token : null;
+  };
+
   const { data: jobs = [], isLoading } = useQuery({
     queryKey: ['admin-jobs'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          creator:profiles!jobs_creator_id_fkey(full_name, username)
-        `)
-        .order('created_at', { ascending: false });
+      const sessionToken = getSessionToken();
+      if (!sessionToken) throw new Error('No admin session');
+
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { action: 'get_jobs' },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      // Get application counts
-      const jobsWithCounts = await Promise.all((data || []).map(async (job) => {
-        const { count } = await supabase
-          .from('job_applications')
-          .select('id', { count: 'exact', head: true })
-          .eq('job_id', job.id);
-        return {
-          ...job,
-          application_count: count || 0,
-        };
-      }));
-
-      return jobsWithCounts as Job[];
+      if (data?.error) throw new Error(data.error);
+      return data.jobs as Job[];
     },
   });
 
   const approvalMutation = useMutation({
     mutationFn: async ({ jobId, status }: { jobId: string; status: 'approved' | 'rejected' }) => {
-      const { error } = await supabase
-        .from('jobs')
-        .update({ 
-          approval_status: status,
-        })
-        .eq('id', jobId);
+      const sessionToken = getSessionToken();
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'update_job',
+          job_id: jobId,
+          updates: { 
+            approval_status: status,
+          }
+        },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      await supabase.from('admin_activity_logs').insert({
-        admin_id: currentUser?.id,
-        action: `${status.charAt(0).toUpperCase() + status.slice(1)} job`,
-        target_type: 'job',
-        target_id: jobId,
-        details: { reason: status === 'rejected' ? actionReason : undefined },
-      });
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-jobs'] });

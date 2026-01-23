@@ -50,55 +50,47 @@ export default function AdminCommunities() {
   const [actionDialog, setActionDialog] = useState<'disable' | 'reject' | null>(null);
   const [actionReason, setActionReason] = useState('');
 
+  // Get admin session token
+  const getSessionToken = () => {
+    const stored = localStorage.getItem('admin_session');
+    return stored ? JSON.parse(stored).session_token : null;
+  };
+
   const { data: communities = [], isLoading } = useQuery({
     queryKey: ['admin-communities'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('communities')
-        .select(`
-          *,
-          creator:profiles!communities_created_by_fkey(full_name, username)
-        `)
-        .order('created_at', { ascending: false });
+      const sessionToken = getSessionToken();
+      if (!sessionToken) throw new Error('No admin session');
+
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { action: 'get_communities' },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      // Get member counts
-      const communitiesWithCounts = await Promise.all((data || []).map(async (community) => {
-        const { count } = await supabase
-          .from('community_members')
-          .select('id', { count: 'exact', head: true })
-          .eq('community_id', community.id);
-        return {
-          ...community,
-          member_count: count || 0,
-        };
-      }));
-
-      return communitiesWithCounts as Community[];
+      if (data?.error) throw new Error(data.error);
+      return data.communities as Community[];
     },
   });
 
   const disableMutation = useMutation({
     mutationFn: async ({ communityId, disable }: { communityId: string; disable: boolean }) => {
-      const { error } = await supabase
-        .from('communities')
-        .update({ 
-          is_disabled: disable,
-          disabled_at: disable ? new Date().toISOString() : null,
-          disabled_reason: disable ? actionReason : null,
-        })
-        .eq('id', communityId);
+      const sessionToken = getSessionToken();
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'update_community',
+          community_id: communityId,
+          updates: { 
+            is_disabled: disable,
+            disabled_at: disable ? new Date().toISOString() : null,
+            disabled_reason: disable ? actionReason : null,
+          }
+        },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      await supabase.from('admin_activity_logs').insert({
-        admin_id: currentUser?.id,
-        action: disable ? 'Disabled community' : 'Enabled community',
-        target_type: 'community',
-        target_id: communityId,
-        details: { reason: actionReason },
-      });
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: (_, { disable }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-communities'] });
@@ -114,23 +106,21 @@ export default function AdminCommunities() {
 
   const approvalMutation = useMutation({
     mutationFn: async ({ communityId, status }: { communityId: string; status: 'approved' | 'rejected' }) => {
-      const { error } = await supabase
-        .from('communities')
-        .update({ 
-          approval_status: status,
-          disabled_reason: status === 'rejected' ? actionReason : null,
-        })
-        .eq('id', communityId);
+      const sessionToken = getSessionToken();
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'update_community',
+          community_id: communityId,
+          updates: { 
+            approval_status: status,
+            disabled_reason: status === 'rejected' ? actionReason : null,
+          }
+        },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      await supabase.from('admin_activity_logs').insert({
-        admin_id: currentUser?.id,
-        action: `${status.charAt(0).toUpperCase() + status.slice(1)} community`,
-        target_type: 'community',
-        target_id: communityId,
-        details: { reason: status === 'rejected' ? actionReason : undefined },
-      });
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-communities'] });

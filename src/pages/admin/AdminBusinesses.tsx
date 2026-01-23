@@ -51,37 +51,43 @@ export default function AdminBusinesses() {
   const [actionDialog, setActionDialog] = useState<'disable' | 'reject' | null>(null);
   const [actionReason, setActionReason] = useState('');
 
+  // Get admin session token
+  const getSessionToken = () => {
+    const stored = localStorage.getItem('admin_session');
+    return stored ? JSON.parse(stored).session_token : null;
+  };
+
   const { data: businesses = [], isLoading } = useQuery({
     queryKey: ['admin-businesses'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('businesses')
-        .select(`
-          *,
-          owner:profiles!businesses_owner_id_fkey(full_name, username)
-        `)
-        .order('created_at', { ascending: false });
+      const sessionToken = getSessionToken();
+      if (!sessionToken) throw new Error('No admin session');
+
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { action: 'get_businesses' },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-      return data as Business[];
+      if (data?.error) throw new Error(data.error);
+      return data.businesses as Business[];
     },
   });
 
   const toggleFeatureMutation = useMutation({
     mutationFn: async ({ businessId, feature }: { businessId: string; feature: boolean }) => {
-      const { error } = await supabase
-        .from('businesses')
-        .update({ is_featured: feature })
-        .eq('id', businessId);
+      const sessionToken = getSessionToken();
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'update_business',
+          business_id: businessId,
+          updates: { is_featured: feature }
+        },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      await supabase.from('admin_activity_logs').insert({
-        admin_id: currentUser?.id,
-        action: feature ? 'Featured business' : 'Unfeatured business',
-        target_type: 'business',
-        target_id: businessId,
-      });
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: (_, { feature }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-businesses'] });
@@ -94,23 +100,21 @@ export default function AdminBusinesses() {
 
   const disableMutation = useMutation({
     mutationFn: async ({ businessId, disable }: { businessId: string; disable: boolean }) => {
-      const { error } = await supabase
-        .from('businesses')
-        .update({ 
-          is_disabled: disable,
-          disabled_reason: disable ? actionReason : null,
-        })
-        .eq('id', businessId);
+      const sessionToken = getSessionToken();
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'update_business',
+          business_id: businessId,
+          updates: { 
+            is_disabled: disable,
+            disabled_reason: disable ? actionReason : null,
+          }
+        },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      await supabase.from('admin_activity_logs').insert({
-        admin_id: currentUser?.id,
-        action: disable ? 'Disabled business' : 'Enabled business',
-        target_type: 'business',
-        target_id: businessId,
-        details: { reason: actionReason },
-      });
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: (_, { disable }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-businesses'] });
@@ -126,23 +130,21 @@ export default function AdminBusinesses() {
 
   const approvalMutation = useMutation({
     mutationFn: async ({ businessId, status }: { businessId: string; status: 'approved' | 'rejected' }) => {
-      const { error } = await supabase
-        .from('businesses')
-        .update({ 
-          approval_status: status,
-          disabled_reason: status === 'rejected' ? actionReason : null,
-        })
-        .eq('id', businessId);
+      const sessionToken = getSessionToken();
+      const { data, error } = await supabase.functions.invoke('admin-data', {
+        body: { 
+          action: 'update_business',
+          business_id: businessId,
+          updates: { 
+            approval_status: status,
+            disabled_reason: status === 'rejected' ? actionReason : null,
+          }
+        },
+        headers: { 'x-session-token': sessionToken },
+      });
 
       if (error) throw error;
-
-      await supabase.from('admin_activity_logs').insert({
-        admin_id: currentUser?.id,
-        action: `${status.charAt(0).toUpperCase() + status.slice(1)} business`,
-        target_type: 'business',
-        target_id: businessId,
-        details: { reason: status === 'rejected' ? actionReason : undefined },
-      });
+      if (data?.error) throw new Error(data.error);
     },
     onSuccess: (_, { status }) => {
       queryClient.invalidateQueries({ queryKey: ['admin-businesses'] });
