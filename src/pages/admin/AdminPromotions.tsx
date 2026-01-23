@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Image, Video, Gift, Layout, FileImage, ExternalLink, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { useAdminAuthSupabase } from '@/hooks/useAdminAuthSupabase';
 
 interface PromotionalContent {
   id: string;
@@ -51,6 +52,7 @@ type ContentType = 'banner' | 'poster' | 'image' | 'video' | 'offer';
 
 export default function AdminPromotions() {
   const queryClient = useQueryClient();
+  const { sessionToken } = useAdminAuthSupabase();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<PromotionalContent | null>(null);
   const [formData, setFormData] = useState({
@@ -72,15 +74,15 @@ export default function AdminPromotions() {
   const { data: promotions, isLoading } = useQuery({
     queryKey: ['admin-promotions'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('promotional_content')
-        .select('*')
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('manage-promotions', {
+        body: { action: 'list', session_token: sessionToken },
+      });
       
       if (error) throw error;
-      return data as PromotionalContent[];
+      if (!data?.success) throw new Error(data?.error || 'Failed to fetch promotions');
+      return data.data as PromotionalContent[];
     },
+    enabled: !!sessionToken,
   });
 
   const uploadImage = async (file: File): Promise<string> => {
@@ -108,21 +110,26 @@ export default function AdminPromotions() {
         setUploading(false);
       }
 
-      const { error } = await supabase.from('promotional_content').insert({
-        title: data.title,
-        description: data.description || null,
-        content_type: data.content_type,
-        image_url: imageUrl || null,
-        video_url: data.video_url || null,
-        link_url: data.link_url || null,
-        link_text: data.link_text || null,
-        is_active: data.is_active,
-        display_order: data.display_order,
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
+      const { data: result, error } = await supabase.functions.invoke('manage-promotions', {
+        body: {
+          action: 'create',
+          session_token: sessionToken,
+          title: data.title,
+          description: data.description || null,
+          content_type: data.content_type,
+          image_url: imageUrl || null,
+          video_url: data.video_url || null,
+          link_url: data.link_url || null,
+          link_text: data.link_text || null,
+          is_active: data.is_active,
+          display_order: data.display_order,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null,
+        },
       });
 
       if (error) throw error;
+      if (!result?.success) throw new Error(result?.error || 'Failed to create promotion');
     },
     onSuccess: () => {
       toast.success('Promotional content created');
@@ -145,21 +152,27 @@ export default function AdminPromotions() {
         setUploading(false);
       }
 
-      const { error } = await supabase.from('promotional_content').update({
-        title: data.title,
-        description: data.description || null,
-        content_type: data.content_type,
-        image_url: imageUrl || null,
-        video_url: data.video_url || null,
-        link_url: data.link_url || null,
-        link_text: data.link_text || null,
-        is_active: data.is_active,
-        display_order: data.display_order,
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
-      }).eq('id', id);
+      const { data: result, error } = await supabase.functions.invoke('manage-promotions', {
+        body: {
+          action: 'update',
+          session_token: sessionToken,
+          id,
+          title: data.title,
+          description: data.description || null,
+          content_type: data.content_type,
+          image_url: imageUrl || null,
+          video_url: data.video_url || null,
+          link_url: data.link_url || null,
+          link_text: data.link_text || null,
+          is_active: data.is_active,
+          display_order: data.display_order,
+          start_date: data.start_date || null,
+          end_date: data.end_date || null,
+        },
+      });
 
       if (error) throw error;
+      if (!result?.success) throw new Error(result?.error || 'Failed to update promotion');
     },
     onSuccess: () => {
       toast.success('Promotional content updated');
@@ -174,8 +187,11 @@ export default function AdminPromotions() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('promotional_content').delete().eq('id', id);
+      const { data: result, error } = await supabase.functions.invoke('manage-promotions', {
+        body: { action: 'delete', session_token: sessionToken, id },
+      });
       if (error) throw error;
+      if (!result?.success) throw new Error(result?.error || 'Failed to delete promotion');
     },
     onSuccess: () => {
       toast.success('Promotional content deleted');
@@ -188,8 +204,11 @@ export default function AdminPromotions() {
 
   const toggleActiveMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { error } = await supabase.from('promotional_content').update({ is_active }).eq('id', id);
+      const { data: result, error } = await supabase.functions.invoke('manage-promotions', {
+        body: { action: 'toggle_active', session_token: sessionToken, id, is_active },
+      });
       if (error) throw error;
+      if (!result?.success) throw new Error(result?.error || 'Failed to toggle status');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-promotions'] });

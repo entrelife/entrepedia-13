@@ -145,7 +145,6 @@ export function PanchayathLocationPicker({ value, onChange }: LocationPickerProp
 
   // Get suggestions for panchayath based on selected district
   const panchayathSuggestions = district ? COMMON_PANCHAYATHS[district] || [] : [];
-  const showPanchayathSelect = panchayathSuggestions.length > 0 && !panchayath;
 
   return (
     <div className="space-y-4">
@@ -191,11 +190,11 @@ export function PanchayathLocationPicker({ value, onChange }: LocationPickerProp
       {/* Panchayath - Show select if suggestions available, otherwise text input */}
       <div className="space-y-2">
         <Label>Panchayath / Municipality</Label>
-        {showPanchayathSelect ? (
+        {panchayathSuggestions.length > 0 ? (
           <div className="space-y-2">
             <Select value={panchayath} onValueChange={setPanchayath}>
               <SelectTrigger>
-                <SelectValue placeholder="Select or type panchayath" />
+                <SelectValue placeholder="Select panchayath" />
               </SelectTrigger>
               <SelectContent>
                 {panchayathSuggestions.map((p) => (
@@ -205,14 +204,17 @@ export function PanchayathLocationPicker({ value, onChange }: LocationPickerProp
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Or type below if not in list
-            </p>
-            <Input
-              placeholder="Type panchayath name if not in list"
-              value={panchayath}
-              onChange={(e) => setPanchayath(e.target.value)}
-            />
+            {!panchayath && (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Or type below if not in list
+                </p>
+                <Input
+                  placeholder="Type panchayath name if not in list"
+                  onChange={(e) => setPanchayath(e.target.value)}
+                />
+              </>
+            )}
           </div>
         ) : (
           <Input
