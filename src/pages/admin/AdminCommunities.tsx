@@ -57,19 +57,37 @@ export default function AdminCommunities() {
     queryKey: ['admin-communities'],
     queryFn: async () => {
       const sessionToken = getSessionToken();
-      if (!sessionToken) throw new Error('No admin session');
+      if (!sessionToken) {
+        // Clear invalid session and redirect
+        localStorage.removeItem('admin_session');
+        window.location.href = '/admin/login';
+        throw new Error('No admin session');
+      }
 
       const { data, error } = await supabase.functions.invoke('admin-manage', {
         body: { action: 'list', entity_type: 'communities' },
         headers: { 'x-session-token': sessionToken },
       });
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (error) {
+        // If session is invalid, clear and redirect
+        if (error.message?.includes('401') || error.message?.includes('session')) {
+          localStorage.removeItem('admin_session');
+          window.location.href = '/admin/login';
+        }
+        throw error;
+      }
+      if (data?.error) {
+        if (data.error.includes('session') || data.error.includes('expired')) {
+          localStorage.removeItem('admin_session');
+          window.location.href = '/admin/login';
+        }
+        throw new Error(data.error);
+      }
       return data.data as Community[];
     },
-    retry: 2,
-    retryDelay: 1000,
+    retry: 1,
+    retryDelay: 500,
   });
 
   const updateMutation = useMutation({
